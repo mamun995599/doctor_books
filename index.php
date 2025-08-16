@@ -12,6 +12,7 @@ if (!$exists) {
     echo "</div>";
     exit;
 }
+
 // Load valid users from XML file
 $validUsers = [];
 $usersFile = __DIR__ . '/users.xml';
@@ -33,6 +34,7 @@ if (file_exists($usersFile)) {
         "usr2" => "1234"
     ];
 }
+
 try {
     $pdo = new PDO("sqlite:$dbFile");
     $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
@@ -276,7 +278,7 @@ try {
         .col-created { width: 120px; }
         .col-updated { width: 120px; }
         .col-id { width: 60px; }
-        .col-action { width: 160px; } /* Increased width to accommodate the new call button */
+        .col-action { width: 160px; }
         
         #loading {
             font-size: var(--form-font-size);
@@ -434,6 +436,30 @@ try {
             .col-ref { width: 200px; }
             .col-marketing { width: 200px; }
         }
+        
+        /* Select2 adjustments for ref_doctor */
+        .ref_doctor_select {
+            min-width: 100%;
+        }
+        
+        .select2-container--default .select2-selection--single {
+            height: 28px !important;
+            border: 1px solid #ced4da !important;
+        }
+        
+        .select2-container--default .select2-selection--single .select2-selection__rendered {
+            line-height: 26px !important;
+            padding-left: 5px !important;
+        }
+        
+        .select2-container--default .select2-selection--single .select2-selection__arrow {
+            height: 26px !important;
+            right: 3px !important;
+        }
+        
+        .select2-container {
+            width: 100% !important;
+        }
     </style>
 </head>
 <body class="p-2">
@@ -446,7 +472,6 @@ try {
         <i id="connectionIcon" class="fas fa-wifi status-icon disconnected-icon"></i>
         <div>
             <strong>WebSocket Status:</strong> <span id="wsStatusText">Connecting...</span>
-            
         </div>
     </div>
     
@@ -526,7 +551,6 @@ try {
         </table>
     </div>
 </div>
-
 <!-- Save Modal -->
 <div class="modal fade" id="saveModal" tabindex="-1" role="dialog">
     <div class="modal-dialog" role="document">
@@ -542,7 +566,6 @@ try {
         </div>
     </div>
 </div>
-
 <!-- Delete Confirmation Modal -->
 <div class="modal fade" id="deleteConfirmModal" tabindex="-1" role="dialog">
     <div class="modal-dialog" role="document">
@@ -570,7 +593,6 @@ try {
         </form>
     </div>
 </div>
-
 <!-- Call Confirmation Modal -->
 <div class="modal fade" id="callConfirmModal" tabindex="-1" role="dialog">
     <div class="modal-dialog" role="document">
@@ -589,7 +611,6 @@ try {
         </div>
     </div>
 </div>
-
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.5.2/dist/js/bootstrap.bundle.min.js"></script>
 <script>
 // Load valid users from PHP
@@ -644,9 +665,34 @@ function getDoctorNameById(doctorId) {
     return doctor ? doctor.doctor_name : '';
 }
 
+function initializeRefDoctorSelect2() {
+    $('.ref_doctor_select').each(function() {
+        if (!$(this).hasClass('select2-hidden-accessible')) {
+            $(this).select2({
+                placeholder: 'Search for a doctor...',
+                allowClear: true,
+                ajax: {
+                    url: 'ref_doctor_search.php',
+                    dataType: 'json',
+                    delay: 250,
+                    data: function (params) {
+                        return { q: params.term };
+                    },
+                    processResults: function (data) {
+                        return data;
+                    },
+                    cache: true
+                },
+                minimumInputLength: 1,
+                tags: true
+            });
+        }
+    });
+}
+
 function addRow(data = {}) {
     const id = data.id || '';
-    const sl = data.sl || slCounter++; // Use SL from database or increment counter
+    const sl = data.sl || slCounter++;
     const name = data.name || '';
     const age = data.age || '';
     const phone = data.phone || '';
@@ -660,6 +706,7 @@ function addRow(data = {}) {
     const entryDate = data.date || $('#date').val();
     const created = data.created_timestamp || '';
     const updated = data.last_updated_timestamp || '';
+    
     const row = `
     <tr data-id="${id}">
         <td class="col-sl">${sl}</td>
@@ -697,7 +744,9 @@ function addRow(data = {}) {
             </select>
         </td>
         <td class="col-ref">
-            <input type="text" class="form-control ref_doctor" value="${escapeHtml(refDoctor)}">
+            <select class="form-control ref_doctor_select" style="width: 100%;">
+                <option value="${escapeHtml(refDoctor)}" selected>${escapeHtml(refDoctor)}</option>
+            </select>
         </td>
         <td class="col-marketing">
             <input type="text" class="form-control marketing_officer" value="${escapeHtml(marketing)}">
@@ -728,10 +777,31 @@ function addRow(data = {}) {
             </div>
         </td>
     </tr>`;
+    
     $('#entryTable tbody').append(row);
     const lastRow = $('#entryTable tbody tr:last');
     const lastPASelect = lastRow.find('.pa-select')[0];
     applyPAColor(lastPASelect);
+    
+    // Initialize Select2 for ref_doctor
+    lastRow.find('.ref_doctor_select').select2({
+        placeholder: 'Search for a doctor...',
+        allowClear: true,
+        ajax: {
+            url: 'ref_doctor_search.php',
+            dataType: 'json',
+            delay: 250,
+            data: function (params) {
+                return { q: params.term };
+            },
+            processResults: function (data) {
+                return data;
+            },
+            cache: true
+        },
+        minimumInputLength: 1,
+        tags: true
+    });
     
     lastRow.find('.pa-select').on('change', function () {
         applyPAColor(this);
@@ -793,7 +863,7 @@ function saveRow(row) {
         status: $row.find('.status-select').val(),
         fees: parseFloat($row.find('.fees').val()) || 0,
         doctor_id: parseInt($row.find('.doctor-select').val()),
-        ref_doctor_name: $row.find('.ref_doctor').val(),
+        ref_doctor_name: $row.find('.ref_doctor_select').val(),
         marketting_officer: $row.find('.marketing_officer').val(),
         date: $row.find('.entry-date').val()
     };
@@ -882,6 +952,9 @@ function createWebSocket() {
                 msg.data.entries.forEach(entry => {
                     addRow(entry);
                 });
+                
+                // Initialize Select2 for ref_doctor dropdowns
+                initializeRefDoctorSelect2();
                 
                 dataLoaded = true;
                 $('#loading').hide();

@@ -12,6 +12,7 @@ class SimpleWebSocketClient {
     private $path;
     private $origin;
     private $key;
+    
     public function __construct($host, $port, $path = '/', $origin = 'localhost') {
         $this->host = $host;
         $this->port = $port;
@@ -19,11 +20,13 @@ class SimpleWebSocketClient {
         $this->origin = $origin;
         $this->key = base64_encode(uniqid());
     }
+    
     public function connect() {
         $this->socket = fsockopen($this->host, $this->port, $errno, $errstr, 5);
         if (!$this->socket) {
             throw new Exception("Failed to connect: $errstr ($errno)");
         }
+        
         // WebSocket handshake
         $handshake = "GET {$this->path} HTTP/1.1\r\n";
         $handshake .= "Host: {$this->host}:{$this->port}\r\n";
@@ -32,7 +35,9 @@ class SimpleWebSocketClient {
         $handshake .= "Sec-WebSocket-Key: {$this->key}\r\n";
         $handshake .= "Sec-WebSocket-Version: 13\r\n";
         $handshake .= "Origin: {$this->origin}\r\n\r\n";
+        
         fwrite($this->socket, $handshake);
+        
         // Read response
         $response = '';
         while (true) {
@@ -45,31 +50,40 @@ class SimpleWebSocketClient {
                 break;
             }
         }
+        
         // Check if handshake was successful
         if (!preg_match('#Sec-WebSocket-Accept:\s(.*)$#mU', $response, $matches)) {
             throw new Exception("Handshake failed");
         }
+        
         $keyAccept = trim($matches[1]);
         $expectedResponse = base64_encode(pack('H*', sha1($this->key . '258EAFA5-E914-47DA-95CA-C5AB0DC85B11')));
+        
         if ($keyAccept !== $expectedResponse) {
             throw new Exception("Handshake failed: key mismatch");
         }
+        
         return true;
     }
+    
     public function send($data) {
         if (!$this->socket) {
             throw new Exception("Not connected");
         }
+        
         // Encode data for WebSocket
         $data = json_encode($data);
         $frame = $this->encode($data);
         fwrite($this->socket, $frame);
     }
+    
     private function encode($data) {
         $length = strlen($data);
         $bytes = [];
+        
         // First byte: FIN (1) and opcode (0x1 for text)
         $bytes[0] = 0x81;
+        
         // Second byte: mask and length
         if ($length <= 125) {
             $bytes[1] = $length | 0x80; // Masked
@@ -89,36 +103,44 @@ class SimpleWebSocketClient {
             $bytes[8] = ($length >> 8) & 0xFF;
             $bytes[9] = $length & 0xFF;
         }
+        
         // Masking key (4 bytes)
         $mask = [];
         for ($i = 0; $i < 4; $i++) {
             $mask[$i] = rand(0, 255);
             $bytes[] = $mask[$i];
         }
+        
         // Apply mask to data
         for ($i = 0; $i < $length; $i++) {
             $bytes[] = ord($data[$i]) ^ $mask[$i % 4];
         }
+        
         return implode('', array_map('chr', $bytes));
     }
+    
     public function close() {
         if ($this->socket) {
             fclose($this->socket);
             $this->socket = null;
         }
     }
+    
     public function __destruct() {
         $this->close();
     }
 }
+
 // Load configuration from XML file
 $config = simplexml_load_file(__DIR__ . '/conf.xml');
 if (!$config) {
     die("Error: Cannot load configuration file conf.xml\n");
 }
+
 // Get SMS server configuration
 $smsHost = (string)$config->sms_server->host;
 $smsPort = (int)$config->sms_server->port;
+
 class UpgradedDiaryServer implements MessageComponentInterface {
     protected $clients;
     protected $pdo;
@@ -141,6 +163,7 @@ class UpgradedDiaryServer implements MessageComponentInterface {
         
         // Enable foreign key support
         $this->pdo->exec("PRAGMA foreign_keys = ON");
+        
         echo "Upgraded server initialized and ready.\n";
         echo "SMS Server: {$this->smsHost}:{$this->smsPort}\n";
     }
@@ -153,6 +176,7 @@ class UpgradedDiaryServer implements MessageComponentInterface {
     public function onMessage(ConnectionInterface $from, $msg) {
         echo "Received: $msg\n";
         $data = json_decode($msg, true);
+        
         if (!$data || !isset($data['type'])) {
             echo "Invalid message format or missing type.\n";
             return;
@@ -408,7 +432,6 @@ class UpgradedDiaryServer implements MessageComponentInterface {
                 ':date' => $entryDate
             ]);
             
-            // Rest of your existing code...
             $entryData = [
                 ':name' => trim($entry['name']),
                 ':age' => trim($entry['age'] ?? ''),
@@ -642,6 +665,7 @@ class UpgradedDiaryServer implements MessageComponentInterface {
         $conn->close();
     }
 }
+
 $port = 8090;
 echo "Starting upgraded server on 0.0.0.0:$port\n";
 $server = Ratchet\Server\IoServer::factory(
