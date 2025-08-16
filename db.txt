@@ -1,0 +1,39 @@
+CREATE TABLE doctor_book (
+    doctor_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    doctor_name TEXT NOT NULL,
+    speciality TEXT
+);
+CREATE TABLE sqlite_sequence(name,seq);
+CREATE TABLE book_details (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    doctor_id INTEGER NOT NULL,
+    date TEXT NOT NULL,
+    time TEXT,
+    FOREIGN KEY (doctor_id) REFERENCES doctor_book(doctor_id),
+    UNIQUE (doctor_id, date)
+);
+CREATE TABLE patients_entry (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    age TEXT,
+    phone TEXT,
+    pa TEXT,
+    status TEXT,
+    fees REAL,
+    doctor_id INTEGER NOT NULL,
+    ref_doctor_name TEXT,
+    marketting_officer TEXT,
+    date TEXT NOT NULL,
+    created_timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+    last_updated_timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (doctor_id, date) REFERENCES book_details(doctor_id, date),
+    FOREIGN KEY (doctor_id) REFERENCES doctor_book(doctor_id)
+);
+CREATE TRIGGER update_patients_entry_timestamp
+AFTER UPDATE ON patients_entry
+FOR EACH ROW
+BEGIN
+    UPDATE patients_entry
+    SET last_updated_timestamp = CURRENT_TIMESTAMP
+    WHERE id = OLD.id;
+END;
